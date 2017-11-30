@@ -299,7 +299,7 @@ class AccountManager {
             .then((res: JsonResponse) => res.body.history);
     }
 
-    public release(appName: string, deploymentName: string, filePath: string, targetBinaryVersion: string, updateMetadata: PackageInfo, uploadProgressCallback?: (progress: number) => void): Promise<Package> {
+    public releaseWithUpdateType(appName: string, deploymentName: string, filePath: string, targetBinaryVersion: string, updateMetadata: PackageInfo,updateType: string, uploadProgressCallback?: (progress: number) => void): Promise<Package> {
 
         return Promise<Package>((resolve, reject, notify) => {
 
@@ -314,6 +314,7 @@ class AccountManager {
                 var file: any = fs.createReadStream(packageFile.path);
                 request.attach("package", file)
                     .field("packageInfo", JSON.stringify(updateMetadata))
+                    .field("updateType", updateType)
                     .on("progress", (event: any) => {
                         if (uploadProgressCallback && event && event.total > 0) {
                             var currentProgress: number = event.loaded / event.total * 100;
@@ -346,6 +347,11 @@ class AccountManager {
                     });
             });
         });
+    }
+
+    public release(appName: string, deploymentName: string, filePath: string, targetBinaryVersion: string, updateMetadata: PackageInfo ,uploadProgressCallback?: (progress: number) => void): Promise<Package> {
+        return this.releaseWithUpdateType(appName, deploymentName, filePath, targetBinaryVersion, updateMetadata, "MINOR", uploadProgressCallback);
+            
     }
 
     public patchRelease(appName: string, deploymentName: string, label: string, updateMetadata: PackageInfo): Promise<void> {

@@ -106,7 +106,12 @@ var coreReleaseHook: cli.ReleaseHook = (currentCommand: cli.IReleaseCommand, ori
 
             return sdk.isAuthenticated(true)
                 .then((isAuth: boolean): Promise<Package> => {
-                    return sdk.release(currentCommand.appName, currentCommand.deploymentName, packagePath, currentCommand.appStoreVersion, updateMetadata, uploadProgress);
+                    if(currentCommand.updateType){                        
+                        return sdk.releaseWithUpdateType(currentCommand.appName, currentCommand.deploymentName, packagePath, currentCommand.appStoreVersion, updateMetadata,currentCommand.updateType,  uploadProgress);                        
+                    }else{
+                        return sdk.release(currentCommand.appName, currentCommand.deploymentName, packagePath, currentCommand.appStoreVersion, updateMetadata, uploadProgress);
+                        
+                    }
                 })
                 .then((): void => {
                     log(`Successfully released an update containing the "${originalCommand.package}" `

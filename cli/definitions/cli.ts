@@ -185,6 +185,7 @@ export interface IReleaseBaseCommand extends ICommand, IPackageInfo {
     deploymentName: string;
     noDuplicateReleaseError?: boolean;
     privateKeyPath?: string;
+    updateType?: string;
 }
 
 export interface IReleaseCommand extends IReleaseBaseCommand {
@@ -207,6 +208,7 @@ export interface IReleaseReactCommand extends IReleaseBaseCommand {
     plistFilePrefix?: string;
     sourcemapOutput?: string;
     outputDir?: string;
+    updateType?: string;
 }
 
 export interface IRollbackCommand extends ICommand {

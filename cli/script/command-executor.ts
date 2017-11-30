@@ -34,6 +34,7 @@ var packageJson = require("../package.json");
 var parseXml = Q.denodeify(require("xml2js").parseString);
 var progress = require("progress");
 import Promise = Q.Promise;
+import { read } from "fs";
 var properties = require("properties");
 
 const ACTIVE_METRICS_KEY: string = "Active";
@@ -1185,7 +1186,8 @@ export var release = (command: cli.IReleaseCommand): Promise<void> => {
             package: command.package,
             rollout: command.rollout,
             privateKeyPath: command.privateKeyPath,
-            type: command.type
+            type: command.type,
+            updateType: command.updateType
         };
 
         var releaseHooksPromise = hooks.reduce((accumulatedPromise: Q.Promise<cli.IReleaseCommand>, hook: cli.ReleaseHook) => {
@@ -1292,6 +1294,15 @@ export var releaseReact = (command: cli.IReleaseReactCommand): Promise<void> => 
     return validateDeployment(command.appName, command.deploymentName)
         .then((): any => {
             releaseCommand.package = outputFolder;
+            console.log("UpdateType   "+releaseCommand.updateType)
+            if(releaseCommand.updateType){
+                switch(releaseCommand.updateType){
+                    case "MAJOR":break;
+                    case "MINOR":break;
+                    default:
+                        throw new Error("Update Type must be either MINOR or MAJOR but was "+releaseCommand.updateType)
+                }
+            }
 
             switch (platform) {
                 case "android":
