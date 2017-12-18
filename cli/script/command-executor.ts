@@ -1371,7 +1371,9 @@ export var releaseReact = (command: cli.IReleaseReactCommand): Promise<void> => 
         // This is needed to clear the react native bundler cache:
         // https://github.com/facebook/react-native/issues/4289
         .then(() => deleteFolder(`${os.tmpdir()}/react-*`))
-        .then(() => runReactNativeBundleCommand(bundleName, command.development || false, entryFile, outputFolder, platform, command.sourcemapOutput))
+        .then(() =>
+			runReactNativeBundleCommand(bundleName, command.development || false, entryFile, outputFolder, platform, command.sourcemapOutput , releaseCommand.updateType)
+			)
         .then(() => {
             log(chalk.cyan("\nReleasing update contents to CodePush:\n"));
             return release(releaseCommand);
@@ -1436,48 +1438,107 @@ function requestAccessKey(): Promise<string> {
     });
 }
 
-export var runReactNativeBundleCommand = (bundleName: string, development: boolean, entryFile: string, outputFolder: string, platform: string, sourcemapOutput: string): Promise<void> => {
+
+
+export var runReactNativeBundleCommand = (bundleName: string, development: boolean, entryFile: string, outputFolder: string, platform: string, sourcemapOutput: string , updateType : string): Promise<void> => {
     let reactNativeBundleArgs: string[] = [];
     let envNodeArgs: string = process.env.CODE_PUSH_NODE_ARGS;
 
     if (typeof envNodeArgs !== "undefined") {
         Array.prototype.push.apply(reactNativeBundleArgs, envNodeArgs.trim().split(/\s+/));
     }
+	if(updateType === "MAJOR"){
+		if(platform === 'android') {
+		
+			process.chdir('android');
+			var cmd = process.platform.lastIndexOf('win') === 0
+				? 'gradlew.bat'
+				: './gradlew';
 
-    Array.prototype.push.apply(reactNativeBundleArgs, [
-        path.join("node_modules", "react-native", "local-cli", "cli.js"), "bundle",
-        "--assets-dest", outputFolder,
-        "--bundle-output", path.join(outputFolder, bundleName),
-        "--dev", development,
-        "--entry-file", entryFile,
-        "--platform", platform,
-    ]);
+			if (sourcemapOutput) {
+				reactNativeBundleArgs.push("--sourcemap-output", sourcemapOutput);
+			}
 
-    if (sourcemapOutput) {
-        reactNativeBundleArgs.push("--sourcemap-output", sourcemapOutput);
-    }
+			log(chalk.cyan("Running \"cd android && gradlew assembleRelease\" command:\n"));
+			return createEmptyTempReleaseFolder("temp").then( () => {
+				
+				var reactNativeBundleProcess = childProcess.execFile(cmd, ['assembleRelease' , '-P' ,'buildDir=' + path.join(process.cwd() , 'temp') ]);
+				//var reactNativeBundleProcess = child_process.exec(cmd);
+				log(`${reactNativeBundleArgs.join(" ")}`);
+		
+				return Promise<void>((resolve, reject, notify) => {
+					reactNativeBundleProcess.stdout.on("data", (data: Buffer) => {
+						log(data.toString().trim());
+					});
 
-    log(chalk.cyan("Running \"react-native bundle\" command:\n"));
-    var reactNativeBundleProcess = spawn("node", reactNativeBundleArgs);
-    log(`node ${reactNativeBundleArgs.join(" ")}`);
+					reactNativeBundleProcess.stderr.on("data", (data: Buffer) => {
+						console.error(data.toString().trim());
+					});
 
-    return Promise<void>((resolve, reject, notify) => {
-        reactNativeBundleProcess.stdout.on("data", (data: Buffer) => {
-            log(data.toString().trim());
-        });
+					reactNativeBundleProcess.on("close", (exitCode: number) => {
+						if (exitCode) {
+							reject(new Error(`"react-native bundle" command exited with code ${exitCode}.`));
+						}
+						var source = path.join(path.join(path.join('temp' , 'outputs') , 'apk') , 'app-release.apk');
+						var target = path.join(outputFolder, 'app-release.apk');
 
-        reactNativeBundleProcess.stderr.on("data", (data: Buffer) => {
-            console.error(data.toString().trim());
-        });
+						var rd = fs.createReadStream(source);
+						//rd.on('error', rejectCleanup);
+						var wr = fs.createWriteStream(target);
+						//wr.on('error', rejectCleanup);
+						process.chdir('..');
+						wr.on('finish', resolve);
+						rd.pipe(wr);
+						
+						
+					});
+				});
+			});
+		
+		}else if(platform === 'ios'){
+			log('currently not supported');
+			// todo implement building ipa
+		}
+		
+		
+	}else{
+		Array.prototype.push.apply(reactNativeBundleArgs, [
+			path.join("node_modules", "react-native", "local-cli", "cli.js"), "bundle",
+			"--assets-dest", outputFolder,
+			"--bundle-output", path.join(outputFolder, bundleName),
+			"--dev", development,
+			"--entry-file", entryFile,
+			"--platform", platform,
+		]);
+		
+		if (sourcemapOutput) {
+			reactNativeBundleArgs.push("--sourcemap-output", sourcemapOutput);
+		}
 
-        reactNativeBundleProcess.on("close", (exitCode: number) => {
-            if (exitCode) {
-                reject(new Error(`"react-native bundle" command exited with code ${exitCode}.`));
-            }
+		log(chalk.cyan("Running \"react-native bundle\" command:\n"));
+		var reactNativeBundleProcess = spawn("node", reactNativeBundleArgs);
+		log(`node ${reactNativeBundleArgs.join(" ")}`);
 
-            resolve(<void>null);
-        });
-    });
+		return Promise<void>((resolve, reject, notify) => {
+			reactNativeBundleProcess.stdout.on("data", (data: Buffer) => {
+				log(data.toString().trim());
+			});
+
+			reactNativeBundleProcess.stderr.on("data", (data: Buffer) => {
+				console.error(data.toString().trim());
+			});
+
+			reactNativeBundleProcess.on("close", (exitCode: number) => {
+				if (exitCode) {
+					reject(new Error(`"react-native bundle" command exited with code ${exitCode}.`));
+				}
+
+				resolve(<void>null);
+			});
+		});
+	}  
+
+   
 }
 
 function serializeConnectionInfo(accessKey: string, preserveAccessKeyOnLogout: boolean, customServerUrl?: string, proxy?: string, noProxy?: boolean): void {
