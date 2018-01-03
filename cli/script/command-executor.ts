@@ -1460,40 +1460,47 @@ export var runReactNativeBundleCommand = (bundleName: string, development: boole
 			}
 
 			log(chalk.cyan("Running \"cd android && gradlew assembleRelease\" command:\n"));
-			return createEmptyTempReleaseFolder("temp").then( () => {
+			
+				var buildDir = childProcess.execFileSync(cmd, ['-q', 'getBuildDir']).toString().trim();
 				
-				var reactNativeBundleProcess = childProcess.execFile(cmd, ['assembleRelease' , '-P' ,'buildDir=' + path.join(process.cwd() , 'temp') ]);
-				//var reactNativeBundleProcess = child_process.exec(cmd);
-				log(`${reactNativeBundleArgs.join(" ")}`);
+				
 		
 				return Promise<void>((resolve, reject, notify) => {
-					reactNativeBundleProcess.stdout.on("data", (data: Buffer) => {
-						log(data.toString().trim());
-					});
+						var reactNativeBundleProcess = childProcess.execFile(cmd, ['assembleRelease']);
+						//var reactNativeBundleProcess = child_process.exec(cmd);
+						log(`${reactNativeBundleArgs.join(" ")}`);
+						reactNativeBundleProcess.stdout.on("data", (data: Buffer) => {
+							log(data.toString().trim());
+						});
 
-					reactNativeBundleProcess.stderr.on("data", (data: Buffer) => {
-						console.error(data.toString().trim());
-					});
+						reactNativeBundleProcess.stderr.on("data", (data: Buffer) => {
+							console.error(data.toString().trim());
+						});
 
-					reactNativeBundleProcess.on("close", (exitCode: number) => {
-						if (exitCode) {
-							reject(new Error(`"react-native bundle" command exited with code ${exitCode}.`));
-						}
-						var source = path.join(path.join(path.join('temp' , 'outputs') , 'apk') , 'app-release.apk');
-						var target = path.join(outputFolder, 'app-release.apk');
+						reactNativeBundleProcess.on("close", (exitCode: number) => {
+							if (exitCode) {
+								reject(new Error(`"react-native bundle" command exited with code ${exitCode}.`));
+							}
+							var source = path.join(path.join(path.join(buildDir , 'outputs') , 'apk') , 'app-release.apk');
+							log("buildDir:" + buildDir);
+							log("outputFolder:" + outputFolder);
+							
+							var target = path.join(outputFolder,'app-release.apk');
 
-						var rd = fs.createReadStream(source);
-						//rd.on('error', rejectCleanup);
-						var wr = fs.createWriteStream(target);
-						//wr.on('error', rejectCleanup);
-						process.chdir('..');
-						wr.on('finish', resolve);
-						rd.pipe(wr);
-						
-						
-					});
+							var rd = fs.createReadStream(source);
+							//rd.on('error', rejectCleanup);
+							var wr = fs.createWriteStream(target);
+							//wr.on('error', rejectCleanup);
+							process.chdir('..');
+							wr.on('finish', resolve);
+							rd.pipe(wr);
+							
+							
+						});
+					
+					
 				});
-			});
+			
 		
 		}else if(platform === 'ios'){
 			log('currently not supported');
